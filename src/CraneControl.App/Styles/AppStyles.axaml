@@ -1,0 +1,160 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Styles.Resources>
+        <x:String x:Key="CraneIconGlyph">🏗</x:String>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#111827"/>
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#17243A"/>
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#232C40"/>
+        <SolidColorBrush x:Key="CraneFieldBrush" Color="#101A2C"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#3DA5FF"/>
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#8492A6"/>
+
+        <LinearGradientBrush x:Key="HookBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#6FC3FF" Offset="0"/>
+            <GradientStop Color="#2C7FE0" Offset="1"/>
+        </LinearGradientBrush>
+    </Styles.Resources>
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}"/>
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="Border.headerBar">
+        <Setter Property="Background" Value="#07549A"/>
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Padding" Value="20,14"/>
+    </Style>
+
+    <Style Selector="TextBlock.appTitle">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="TextBlock.appSubtitle">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    </Style>
+
+    <Style Selector="Border.statusPill">
+        <Setter Property="Background" Value="#D65F68"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="14,8"/>
+    </Style>
+
+    <Style Selector="TextBlock.statusText">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="TextBlock.statusIcon">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style Selector="Border.statusPill.ok">
+        <Setter Property="Background" Value="#2EBD85"/>
+    </Style>
+
+    <Style Selector="Ellipse.statusDot">
+        <Setter Property="Fill" Value="#E5484D"/>
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Height" Value="10"/>
+    </Style>
+
+    <Style Selector="Ellipse.statusDot.ok">
+        <Setter Property="Fill" Value="#34D399"/>
+    </Style>
+
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+    </Style>
+
+    <Style Selector="Border.card:pointerover">
+        <Setter Property="BorderBrush" Value="#2E3B54"/>
+    </Style>
+
+    <Style Selector="TextBlock.cardTitle">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="#E6ECF5"/>
+    </Style>
+
+    <Style Selector="Border.modeBadge">
+        <Setter Property="Background" Value="#FFB020"/>
+        <Setter Property="BorderBrush" Value="#FFB020"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="8,2"/>
+    </Style>
+
+    <Style Selector="Border.modeBadge TextBlock">
+        <Setter Property="Foreground" Value="#101828"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style Selector="Border.miniChart">
+        <Setter Property="Background" Value="#101A2C"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="10,8"/>
+    </Style>
+
+    <Style Selector="TextBlock.miniChartTitle">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="Margin" Value="2,0,0,4"/>
+    </Style>
+
+    <Style Selector="TextBlock.fieldLabel">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    </Style>
+
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="16,6"/>
+    </Style>
+
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#4FB2FF"/>
+    </Style>
+
+    <Style Selector="Border.currentModeBadge">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.currentModeBadge.auto">
+        <Setter Property="Background" Value="#7C4DFF"/>
+    </Style>
+
+    <Style Selector="TextBlock.currentModeBadgeText">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="LetterSpacing" Value="0.5"/>
+    </Style>
+
+</Styles>

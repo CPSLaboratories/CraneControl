@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CraneControl.App.ViewModels"
+             xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
+             x:Class="CraneControl.App.Views.AxisChartGroupView"
+             x:DataType="vm:AxisChartGroupViewModel">
+    <Border Classes="card" Padding="16">
+        <Grid RowDefinitions="Auto,*,*,*">
+            <TextBlock Grid.Row="0" Text="{Binding GroupTitle}" Classes="cardTitle" Margin="0,0,0,10"/>
+
+            <Border Grid.Row="1" Classes="miniChart" DataContext="{Binding Velocity}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Classes="miniChartTitle"/>
+                    <lvc:CartesianChart Series="{Binding Series}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}"
+                                        TooltipPosition="Hidden" LegendPosition="Hidden"/>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Row="2" Classes="miniChart" Margin="0,10,0,0" DataContext="{Binding Acceleration}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Classes="miniChartTitle"/>
+                    <lvc:CartesianChart Series="{Binding Series}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}"
+                                        TooltipPosition="Hidden" LegendPosition="Hidden"/>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Row="3" Classes="miniChart" Margin="0,10,0,0" DataContext="{Binding Distance}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" Classes="miniChartTitle"/>
+                    <lvc:CartesianChart Series="{Binding Series}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}"
+                                        TooltipPosition="Hidden" LegendPosition="Hidden"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

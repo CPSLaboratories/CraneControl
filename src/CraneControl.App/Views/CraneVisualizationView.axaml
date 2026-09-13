@@ -1,0 +1,80 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CraneControl.App.ViewModels"
+             x:Class="CraneControl.App.Views.CraneVisualizationView"
+             x:DataType="vm:CraneVisualizationViewModel">
+    <Border Classes="card" Padding="16">
+        <Grid RowDefinitions="Auto,*">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                <TextBlock Text="Podgląd dźwignicy" Classes="cardTitle"/>
+                <Border Classes="modeBadge" IsVisible="{Binding IsAutoMode}">
+                    <TextBlock Text="AUTO — kliknij, aby zadać pozycję" FontSize="13"/>
+                </Border>
+            </StackPanel>
+
+            <Viewbox Grid.Row="1" Stretch="Uniform">
+                <Canvas Name="FieldCanvas"
+                        Width="{Binding FieldWidth}" Height="{Binding FieldHeight}"
+                        Background="{StaticResource CraneFieldBrush}"
+                        ClipToBounds="True"
+                        Cursor="{Binding IsAutoMode, Converter={x:Static vm:BoolToCursorConverter.Instance}}"
+                        PointerPressed="OnCanvasPointerPressed">
+
+                    <!-- Szyna jezdna (oś X) -->
+                    <Rectangle Canvas.Left="0" Canvas.Top="{Binding RailY}"
+                               Width="{Binding FieldWidth}" Height="5" Fill="#3A4A63" RadiusX="2" RadiusY="2"/>
+
+                    <!-- Znacznik celu (tryb automatyczny) -->
+                    <Ellipse IsVisible="{Binding HasTarget}"
+                             Canvas.Left="{Binding TargetLeft}" Canvas.Top="{Binding TargetTop}"
+                             Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
+                             Stroke="#FFB020" StrokeThickness="2" StrokeDashArray="4,3" Fill="Transparent">
+                        <Ellipse.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.15"/>
+                                <DoubleTransition Property="Canvas.Top" Duration="0:0:0.15"/>
+                            </Transitions>
+                        </Ellipse.Transitions>
+                    </Ellipse>
+
+                    <!-- Lina -->
+                    <Rectangle Canvas.Left="{Binding RopeLeft}" Canvas.Top="{Binding RailY}"
+                               Width="2" Height="{Binding RopeLength}" Fill="#8492A6">
+                        <Rectangle.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
+                                <DoubleTransition Property="Height" Duration="0:0:0.12"/>
+                            </Transitions>
+                        </Rectangle.Transitions>
+                    </Rectangle>
+
+                    <!-- Wózek jezdny -->
+                    <Border Canvas.Left="{Binding TrolleyLeft}" Canvas.Top="{Binding TrolleyTop}"
+                            Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
+                            Background="#5B6B85" CornerRadius="3">
+                        <Border.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
+
+                    <!-- Hak -->
+                    <Ellipse Canvas.Left="{Binding HookLeft}" Canvas.Top="{Binding HookTop}"
+                             Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
+                             Fill="{StaticResource HookBrush}">
+                        <Ellipse.Effect>
+                            <DropShadowEffect Color="#FF3DA5FF" BlurRadius="14" OffsetX="0" OffsetY="0" Opacity="0.6"/>
+                        </Ellipse.Effect>
+                        <Ellipse.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
+                                <DoubleTransition Property="Canvas.Top" Duration="0:0:0.12"/>
+                            </Transitions>
+                        </Ellipse.Transitions>
+                    </Ellipse>
+                </Canvas>
+            </Viewbox>
+        </Grid>
+    </Border>
+</UserControl>

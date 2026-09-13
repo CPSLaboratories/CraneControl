@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:CraneControl.App.ViewModels"
+        xmlns:views="using:CraneControl.App.Views"
+        x:Class="CraneControl.App.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Sterowanie dźwignicą dydaktyczną"
+        Icon="avares://CraneControl.App/Assets/crane-icon.png"
+        Width="1440" Height="900" MinWidth="1100" MinHeight="700"
+        Focusable="True"
+        KeyDown="OnWindowKeyDown"
+        KeyUp="OnWindowKeyUp">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <Border Grid.Row="0" Classes="headerBar">
+            <Grid ColumnDefinitions="Auto,*">
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock Text="{StaticResource CraneIconGlyph}" FontSize="28"/>
+                    <StackPanel>
+                        <TextBlock Text="Sterowanie dźwignicą dydaktyczną" Classes="appTitle"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center"
+                            HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Sterownik PLC:" Classes="fieldLabel" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding PlcHost}" Watermark="Adres IP" Width="170"/>
+                        <NumericUpDown Value="{Binding PlcPort}" Minimum="1" Maximum="65535" FormatString="0" Width="130"/>
+                        <Button Content="Połącz" Command="{Binding ConnectCommand}"
+                                IsEnabled="{Binding !IsConnectingToPlc}" Classes="accent"/>
+                        <ToggleSwitch IsChecked="{Binding IsRealPlcMode}"
+                                      OnContent="Rzeczywisty PLC" OffContent="Symulacja"
+                                      ToolTip.Tip="{Binding ConnectionMessage}"/>
+                    </StackPanel>
+
+                    <Border Classes="statusPill" Classes.ok="{Binding IsConnected}">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ConnectionStatusIcon}" Classes="statusIcon"/>
+                            <TextBlock Text="{Binding StatusMessage}" Classes="statusText"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="1.15*,*,*" Margin="20">
+
+            <Grid Grid.Column="0" RowDefinitions="*,Auto" Margin="0,0,16,0">
+                <views:CraneVisualizationView Grid.Row="0"
+                                               DataContext="{Binding Visualization}"
+                                               VisualizationClicked="OnVisualizationClicked"/>
+
+                <Border Grid.Row="1" Classes="card" Margin="0,16,0,0" Padding="18">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Prędkość ruchu — oś X" Classes="fieldLabel"/>
+                            <Slider Minimum="0" Maximum="100" Value="{Binding SpeedX}"/>
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Prędkość ruchu — oś Y" Classes="fieldLabel"/>
+                            <Slider Minimum="0" Maximum="100" Value="{Binding SpeedY}"/>
+                        </StackPanel>
+                        <ToggleSwitch IsChecked="{Binding IsAutoMode}"
+                                      OnContent="Sterowanie automatyczne"
+                                      OffContent="Sterowanie ręczne"
+                                      HorizontalAlignment="Stretch"
+                                      HorizontalContentAlignment="Center"/>
+
+                        <Border Classes="currentModeBadge" Classes.auto="{Binding IsAutoMode}" HorizontalAlignment="Stretch">
+                            <TextBlock Text="{Binding CurrentModeLabel}" HorizontalAlignment="Center" Classes="currentModeBadgeText"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <views:AxisChartGroupView Grid.Column="1" DataContext="{Binding ChartsX}" Margin="0,0,16,0"/>
+            <views:AxisChartGroupView Grid.Column="2" DataContext="{Binding ChartsY}"/>
+        </Grid>
+    </Grid>
+</Window>
+
+

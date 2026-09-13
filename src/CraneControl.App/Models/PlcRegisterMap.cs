@@ -2,7 +2,7 @@ namespace CraneControl.App.Models;
 
 /// <summary>
 /// Mapa rejestrów Modbus TCP (Holding Registers) używana do komunikacji ze sterownikiem PLC.
-/// Pełny opis znajduje się w PLC_REGISTER_MAP.md w katalogu głównym repozytorium.
+/// Pełny opis znajduje się w README.md w katalogu głównym repozytorium.
 /// </summary>
 public static class PlcRegisterMap
 {

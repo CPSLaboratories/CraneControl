@@ -1,3 +1,29 @@
+# CraneControl
+
+## Kompilacja i release
+
+Zwykła kompilacja developerska:
+
+```powershell
+dotnet build src/CraneControl.App/CraneControl.App.csproj
+```
+
+Publikacja release jako self-contained Native AOT dla Windows x64:
+
+```powershell
+dotnet publish src/CraneControl.App/CraneControl.App.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -o artifacts/release/win-x64
+```
+
+Gotowy artefakt znajduje się w `artifacts/release/win-x64`. Plik `CraneControl.App.exe`
+jest natywną aplikacją AOT; trzy biblioteki DLL obok niego są natywnymi zależnościami
+renderera Avalonia/Skia i muszą pozostać w tym samym katalogu.
+
+Do uruchomienia release wystarczy dwukrotnie kliknąć `CraneControl.App.exe`.
+
 # Mapa rejestrów Modbus TCP/IP dla sterownika PLC dźwignicy
 
 Aplikacja (master) łączy się ze sterownikiem PLC (slave) protokołem **Modbus TCP/IP**

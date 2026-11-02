@@ -6,73 +6,75 @@
     <Border Classes="card" Padding="16">
         <Grid RowDefinitions="Auto,*">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-                <TextBlock Text="Podgląd dźwignicy" Classes="cardTitle"/>
-                <Border Classes="modeBadge" IsVisible="{Binding IsAutoMode}">
-                    <TextBlock Text="AUTO — kliknij, aby zadać pozycję" FontSize="13"/>
+                <TextBlock Text="Podgląd osi X" Classes="cardTitle"/>
+                <Border Classes="modeBadge">
+                    <TextBlock Text="Kliknij na skali, aby zadać pozycję" FontSize="13"/>
                 </Border>
             </StackPanel>
 
             <Viewbox Grid.Row="1" Stretch="Uniform">
-                <Canvas Name="FieldCanvas"
-                        Width="{Binding FieldWidth}" Height="{Binding FieldHeight}"
+                <Canvas Width="{x:Static vm:CraneVisualizationViewModel.FieldWidth}"
+                        Height="{x:Static vm:CraneVisualizationViewModel.FieldHeight}"
                         Background="{StaticResource CraneFieldBrush}"
                         ClipToBounds="True"
-                        Cursor="{Binding IsAutoMode, Converter={x:Static vm:BoolToCursorConverter.Instance}}"
+                        Cursor="Hand"
                         PointerPressed="OnCanvasPointerPressed">
 
-                    <!-- Szyna jezdna (oś X) -->
-                    <Rectangle Canvas.Left="0" Canvas.Top="{Binding RailY}"
-                               Width="{Binding FieldWidth}" Height="5" Fill="#3A4A63" RadiusX="2" RadiusY="2"/>
+                    <!-- Szyna jezdna -->
+                    <Rectangle Canvas.Left="40" Canvas.Top="80" Width="720" Height="6" Fill="#3A4A63" RadiusX="2" RadiusY="2"/>
 
-                    <!-- Znacznik celu (tryb automatyczny) -->
-                    <Ellipse IsVisible="{Binding HasTarget}"
-                             Canvas.Left="{Binding TargetLeft}" Canvas.Top="{Binding TargetTop}"
-                             Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
-                             Stroke="#FFB020" StrokeThickness="2" StrokeDashArray="4,3" Fill="Transparent">
-                        <Ellipse.Transitions>
-                            <Transitions>
-                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.15"/>
-                                <DoubleTransition Property="Canvas.Top" Duration="0:0:0.15"/>
-                            </Transitions>
-                        </Ellipse.Transitions>
-                    </Ellipse>
+                    <!-- Podziałka co 10 cm (40 + 90 * i) -->
+                    <Rectangle Canvas.Left="39" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="129" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="219" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="309" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="399" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="489" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="579" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="669" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
+                    <Rectangle Canvas.Left="759" Canvas.Top="92" Width="2" Height="12" Fill="#8492A6"/>
 
-                    <!-- Lina -->
-                    <Rectangle Canvas.Left="{Binding RopeLeft}" Canvas.Top="{Binding RailY}"
-                               Width="2" Height="{Binding RopeLength}" Fill="#8492A6">
-                        <Rectangle.Transitions>
-                            <Transitions>
-                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
-                                <DoubleTransition Property="Height" Duration="0:0:0.12"/>
-                            </Transitions>
-                        </Rectangle.Transitions>
-                    </Rectangle>
+                    <TextBlock Canvas.Left="20" Canvas.Top="108" Width="40" TextAlignment="Center" Text="0" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="110" Canvas.Top="108" Width="40" TextAlignment="Center" Text="10" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="200" Canvas.Top="108" Width="40" TextAlignment="Center" Text="20" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="290" Canvas.Top="108" Width="40" TextAlignment="Center" Text="30" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="380" Canvas.Top="108" Width="40" TextAlignment="Center" Text="40" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="470" Canvas.Top="108" Width="40" TextAlignment="Center" Text="50" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="560" Canvas.Top="108" Width="40" TextAlignment="Center" Text="60" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="650" Canvas.Top="108" Width="40" TextAlignment="Center" Text="70" Classes="tickLabel"/>
+                    <TextBlock Canvas.Left="740" Canvas.Top="108" Width="40" TextAlignment="Center" Text="80 cm" Classes="tickLabel"/>
 
-                    <!-- Wózek jezdny -->
-                    <Border Canvas.Left="{Binding TrolleyLeft}" Canvas.Top="{Binding TrolleyTop}"
-                            Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
-                            Background="#5B6B85" CornerRadius="3">
+                    <!-- Znacznik celu -->
+                    <Rectangle IsVisible="{Binding HasTarget}"
+                               Canvas.Left="{Binding TargetLeft}" Canvas.Top="36" Width="4" Height="64"
+                               Fill="#FFB020" RadiusX="2" RadiusY="2"/>
+
+                    <!-- Wózek -->
+                    <Border Canvas.Left="{Binding TrolleyLeft}" Canvas.Top="54"
+                            Width="{x:Static vm:CraneVisualizationViewModel.TrolleyWidth}"
+                            Height="{x:Static vm:CraneVisualizationViewModel.TrolleyHeight}"
+                            Background="{StaticResource HookBrush}" CornerRadius="4">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#FF3DA5FF" BlurRadius="14" OffsetX="0" OffsetY="0" Opacity="0.6"/>
+                        </Border.Effect>
                         <Border.Transitions>
                             <Transitions>
-                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.08"/>
                             </Transitions>
                         </Border.Transitions>
                     </Border>
 
-                    <!-- Hak -->
-                    <Ellipse Canvas.Left="{Binding HookLeft}" Canvas.Top="{Binding HookTop}"
-                             Width="{Binding HookDiameter}" Height="{Binding HookDiameter}"
-                             Fill="{StaticResource HookBrush}">
-                        <Ellipse.Effect>
-                            <DropShadowEffect Color="#FF3DA5FF" BlurRadius="14" OffsetX="0" OffsetY="0" Opacity="0.6"/>
-                        </Ellipse.Effect>
-                        <Ellipse.Transitions>
+                    <!-- Aktualna pozycja -->
+                    <TextBlock Canvas.Left="{Binding PositionLabelLeft}" Canvas.Top="22"
+                               Width="{x:Static vm:CraneVisualizationViewModel.PositionLabelWidth}" TextAlignment="Center"
+                               Text="{Binding PositionText}" FontSize="16" FontWeight="Bold" Foreground="White"
+                               TextWrapping="NoWrap">
+                        <TextBlock.Transitions>
                             <Transitions>
-                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.12"/>
-                                <DoubleTransition Property="Canvas.Top" Duration="0:0:0.12"/>
+                                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.08"/>
                             </Transitions>
-                        </Ellipse.Transitions>
-                    </Ellipse>
+                        </TextBlock.Transitions>
+                    </TextBlock>
                 </Canvas>
             </Viewbox>
         </Grid>

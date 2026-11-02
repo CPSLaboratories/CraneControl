@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CraneControl.App.ViewModels"
+             xmlns:views="using:CraneControl.App.Views"
+             x:Class="CraneControl.App.Views.AxisXView"
+             x:DataType="vm:AxisXViewModel">
+    <Grid ColumnDefinitions="1.2*,*">
+
+        <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="0,0,16,0">
+            <views:CraneVisualizationView Grid.Row="0" DataContext="{Binding Visualization}"
+                                          VisualizationClicked="OnVisualizationClicked"/>
+
+            <Border Grid.Row="1" Classes="card" Margin="0,16,0,0" Padding="18">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Sterowanie osią X" Classes="cardTitle"/>
+
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Pozycja zadana [cm] (0 – 80)" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding TargetCm}" Minimum="0" Maximum="80" Increment="1"
+                                           FormatString="0.00" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Jedź" Command="{Binding GoToTargetCommand}"
+                                Classes="accent" VerticalAlignment="Bottom"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="6">
+                            <TextBlock Text="Prędkość [m/s] (0 – 2)" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding VelocityMps}" Minimum="0" Maximum="2" Increment="0.05"
+                                           FormatString="0.00" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <TextBlock Text="Przysp. rozpędzania [m/s²] (0 – 20)" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding AccelMps2}" Minimum="0" Maximum="20" Increment="0.5"
+                                           FormatString="0.0" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="6">
+                            <TextBlock Text="Przysp. hamowania [m/s²] (0 – 20)" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding DecelMps2}" Minimum="0" Maximum="20" Increment="0.5"
+                                           FormatString="0.0" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Bazuj" Command="{Binding HomeCommand}" Classes="accent"/>
+                        <Button Content="Ack Błędy" Command="{Binding AckErrorCommand}" Classes="accent"/>
+                        <ToggleButton Content="ON/OFF" IsChecked="{Binding IsPozEnForcedOff}" Classes="forceOff"
+                                      ToolTip.Tip="OFF: PozEN wymuszone na 0, ruchy zablokowane"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Ellipse Classes="statusDot" Classes.ok="{Binding IsReferenced}"/>
+                            <TextBlock Text="Zbazowana" Classes="fieldLabel"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <Ellipse Classes="statusDot" Classes.ok="{Binding IsAxisEnabled}"/>
+                            <TextBlock Text="Oś aktywna" Classes="fieldLabel"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="Strzałki ← / → przesuwają wózek o 10 cm (jedno wciśnięcie = jeden skok)."
+                               Classes="fieldLabel" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <views:AxisChartGroupView Grid.Column="1" DataContext="{Binding Charts}"/>
+    </Grid>
+</UserControl>

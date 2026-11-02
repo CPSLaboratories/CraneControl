@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CraneControl.App.ViewModels"
+             xmlns:views="using:CraneControl.App.Views"
+             x:Class="CraneControl.App.Views.AxisYView"
+             x:DataType="vm:AxisYViewModel">
+    <Grid ColumnDefinitions="420,*">
+
+        <Border Grid.Column="0" Classes="card" Margin="0,0,16,0" Padding="18">
+            <ScrollViewer>
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Sterowanie osią Y (podnoszenie)" Classes="cardTitle"/>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Border Grid.Column="0" Classes="holdButton" Classes.active="{Binding IsMovingUp}" Tag="up"
+                                PointerPressed="OnHoldPressed" PointerReleased="OnHoldReleased"
+                                PointerCaptureLost="OnHoldCaptureLost">
+                            <TextBlock Text="▲ Góra" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                        </Border>
+                        <Border Grid.Column="1" Classes="holdButton" Classes.active="{Binding IsMovingDown}" Tag="down"
+                                PointerPressed="OnHoldPressed" PointerReleased="OnHoldReleased"
+                                PointerCaptureLost="OnHoldCaptureLost">
+                            <TextBlock Text="▼ Dół" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                        </Border>
+                    </Grid>
+                    <TextBlock Text="Przytrzymaj przycisk lub strzałkę ↑ / ↓. Puszczenie = natychmiastowy stop (PionEN = 0)."
+                               Classes="fieldLabel" TextWrapping="Wrap"/>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Prędkość zadana [obr/min] (0 – 150)" Classes="fieldLabel"/>
+                        <NumericUpDown Value="{Binding SpeedSetRpm}" Minimum="0" Maximum="150" Increment="1"
+                                       FormatString="0" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="6">
+                            <TextBlock Text="Masa obciążenia [kg]" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding LoadKg}" Minimum="0" Maximum="1000" Increment="0.1"
+                                           FormatString="0.00" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <TextBlock Text="Offset momentu [Nm]" Classes="fieldLabel"/>
+                            <NumericUpDown Value="{Binding TorqueOffsetNm}" Minimum="0" Maximum="1000" Increment="0.01"
+                                           FormatString="0.000" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button Content="Ack Błędy" Command="{Binding AckErrorCommand}" Classes="accent"
+                            HorizontalAlignment="Left"/>
+
+                    <Border Classes="miniChart" Padding="14">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+                            <TextBlock Grid.Row="0" Text="Prędkość obrotowa" Classes="fieldLabel"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SpeedRpm, StringFormat='{}{0:0.0} obr/min'}"
+                                       Foreground="White" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="1" Text="Prędkość liniowa" Classes="fieldLabel"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LinearSpeedMps, StringFormat='{}{0:0.000} m/s'}"
+                                       Foreground="White" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="2" Text="Moment statyczny" Classes="fieldLabel"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TorqueNm, StringFormat='{}{0:0.000} Nm'}"
+                                       Foreground="White" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="3" Text="Moc mechaniczna" Classes="fieldLabel"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PowerW, StringFormat='{}{0:0.00} W'}"
+                                       Foreground="White" FontWeight="SemiBold"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <views:AxisChartGroupView Grid.Column="1" DataContext="{Binding Charts}"/>
+    </Grid>
+</UserControl>

@@ -1,81 +1,57 @@
 namespace CraneControl.App.ViewModels;
 
 /// <summary>
-/// Grupa trzech wykresów (prędkość, przyspieszenie, droga) dla jednej osi.
-/// W trybie ręcznym działa jak bufor kołowy (ostatnie 15 s) - najstarszy punkt jest
-/// zawsze przebazowywany do X=0. W trybie automatycznym
-/// rysuje od momentu startu ruchu (też od X=0) i zamraża się po jego zakończeniu.
+/// Zestaw wykresów jednej osi. Rejestruje tylko podczas ruchu: każdy nowy ruch czyści wykresy
+/// i zaczyna od t = 0, a po zakończeniu ruchu wykresy pozostają zamrożone.
 /// </summary>
 public sealed class AxisChartGroupViewModel
 {
-    private const double ManualWindowSeconds = 15;
+    private double _runStart;
 
-    private readonly List<double> _timestamps = new();
-
-    public AxisChartGroupViewModel(string axisName, uint velocityColor, uint accelerationColor, uint distanceColor)
+    public AxisChartGroupViewModel(string title, int columns, params MiniChartViewModel[] charts)
     {
-        GroupTitle = $"Oś {axisName}";
-        Velocity = new MiniChartViewModel($"Prędkość ({axisName})", " mm/s", velocityColor, minSpan: 20);
-        Acceleration = new MiniChartViewModel($"Przyspieszenie ({axisName})", " mm/s²", accelerationColor, minSpan: 60);
-        Distance = new MiniChartViewModel($"Droga ({axisName})", " mm", distanceColor, minSpan: 20);
+        GroupTitle = title;
+        Columns = columns;
+        Charts = charts;
     }
 
     public string GroupTitle { get; }
 
-    public MiniChartViewModel Velocity { get; }
+    public int Columns { get; }
 
-    public MiniChartViewModel Acceleration { get; }
+    public IReadOnlyList<MiniChartViewModel> Charts { get; }
 
-    public MiniChartViewModel Distance { get; }
-
-    /// <summary>Dodaje próbkę i w trybie ręcznym przycina bufor do ostatnich 15 s.</summary>
-    public void AddSample(double elapsedSeconds, double velocity, double acceleration, double distance, bool trimToWindow)
+    public void Restart(double elapsedSeconds)
     {
-        _timestamps.Add(elapsedSeconds);
-        Velocity.AddRaw(velocity);
-        Acceleration.AddRaw(acceleration);
-        Distance.AddRaw(distance);
-
-        if (trimToWindow)
+        _runStart = elapsedSeconds;
+        foreach (var chart in Charts)
         {
-            var cutoff = elapsedSeconds - ManualWindowSeconds;
-            while (_timestamps.Count > 0 && _timestamps[0] < cutoff)
-            {
-                _timestamps.RemoveAt(0);
-                Velocity.RemoveOldest();
-                Acceleration.RemoveOldest();
-                Distance.RemoveOldest();
-            }
+            chart.Clear();
         }
-
-        RebaseX();
     }
 
-    /// <summary>Czyści wykresy przed nowym ruchem w trybie automatycznym.</summary>
-    public void ClearAndRestart()
+    /// <summary>Zachowuje tylko ostatnie <paramref name="windowSeconds"/> sekund (rejestracja ciągła).</summary>
+    public void Trim(double elapsedSeconds, double windowSeconds)
     {
-        _timestamps.Clear();
-        Velocity.Clear();
-        Acceleration.Clear();
-        Distance.Clear();
-    }
-
-    /// <summary>Przelicza X wszystkich zachowanych punktów tak, aby najstarszy zawsze wypadał w X=0.</summary>
-    private void RebaseX()
-    {
-        if (_timestamps.Count == 0)
+        var cutoff = (elapsedSeconds - _runStart) - windowSeconds;
+        if (cutoff <= 0)
         {
             return;
         }
 
-        var origin = _timestamps[0];
-        for (var i = 0; i < _timestamps.Count; i++)
+        foreach (var chart in Charts)
         {
-            var relative = _timestamps[i] - origin;
-            Velocity.SetX(i, relative);
-            Acceleration.SetX(i, relative);
-            Distance.SetX(i, relative);
+            chart.TrimBefore(cutoff);
+        }
+    }
+
+    /// <summary>Dodaje próbkę; wartości muszą być w kolejności zgodnej z <see cref="Charts"/>.</summary>
+    public void AddSample(double elapsedSeconds, params double[] values)
+    {
+        var t = elapsedSeconds - _runStart;
+        for (var i = 0; i < Charts.Count && i < values.Length; i++)
+        {
+            Charts[i].Add(t, values[i]);
         }
     }
 }
-

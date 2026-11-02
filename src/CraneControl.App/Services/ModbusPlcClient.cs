@@ -40,23 +40,14 @@ public sealed class ModbusPlcClient : IPlcClient
         var regs = await _master.ReadHoldingRegistersAsync(
             _slaveId, PlcRegisterMap.ReadBlockStart, PlcRegisterMap.ReadBlockLength);
 
-        var status = regs[PlcRegisterMap.StatusWord - PlcRegisterMap.ReadBlockStart];
+        ushort Reg(ushort address) => regs[address - PlcRegisterMap.ReadBlockStart];
 
         return new CraneState
         {
-            PositionXmm = regs[PlcRegisterMap.PositionX - PlcRegisterMap.ReadBlockStart] / PlcRegisterMap.PositionScale,
-            PositionYmm = regs[PlcRegisterMap.PositionY - PlcRegisterMap.ReadBlockStart] / PlcRegisterMap.PositionScale,
-            Ready = IsBitSet(status, StatusBits.Ready),
-            Fault = IsBitSet(status, StatusBits.Fault),
-            MovingX = IsBitSet(status, StatusBits.MovingX),
-            MovingY = IsBitSet(status, StatusBits.MovingY),
-            LimitXMinus = IsBitSet(status, StatusBits.LimitXMinus),
-            LimitXPlus = IsBitSet(status, StatusBits.LimitXPlus),
-            LimitYMinus = IsBitSet(status, StatusBits.LimitYMinus),
-            LimitYPlus = IsBitSet(status, StatusBits.LimitYPlus),
-            AutoModeActive = IsBitSet(status, StatusBits.AutoModeActive),
-            InPosition = IsBitSet(status, StatusBits.InPosition),
-            FaultCode = regs[PlcRegisterMap.FaultCode - PlcRegisterMap.ReadBlockStart],
+            PositionXcm = PlcScaling.RawToPositionCm(Reg(PlcRegisterMap.PozPositionAct)),
+            AxisXEnabled = Reg(PlcRegisterMap.PozAxisEnabled) != 0,
+            AxisXReferenced = Reg(PlcRegisterMap.PozAxisRef) != 0,
+            SpeedYRpm = PlcScaling.RawToPionSpeedOutRpm(unchecked((short)Reg(PlcRegisterMap.PionSpeedOut))),
         };
     }
 
@@ -67,32 +58,27 @@ public sealed class ModbusPlcClient : IPlcClient
             throw new InvalidOperationException("Klient Modbus nie jest połączony.");
         }
 
-        ushort command = 0;
-        SetBit(ref command, CommandBits.AutoMode, outputs.AutoMode);
-        SetBit(ref command, CommandBits.Stop, outputs.Stop);
-        SetBit(ref command, CommandBits.StartMove, outputs.StartMove);
-        SetBit(ref command, CommandBits.Enable, outputs.Enable);
-
         var values = new ushort[PlcRegisterMap.WriteBlockLength];
-        values[PlcRegisterMap.CommandWord - PlcRegisterMap.WriteBlockStart] = command;
-        values[PlcRegisterMap.JogX - PlcRegisterMap.WriteBlockStart] = unchecked((ushort)outputs.JogX);
-        values[PlcRegisterMap.JogY - PlcRegisterMap.WriteBlockStart] = unchecked((ushort)outputs.JogY);
-        values[PlcRegisterMap.SpeedX - PlcRegisterMap.WriteBlockStart] = outputs.SpeedX;
-        values[PlcRegisterMap.SpeedY - PlcRegisterMap.WriteBlockStart] = outputs.SpeedY;
-        values[PlcRegisterMap.TargetX - PlcRegisterMap.WriteBlockStart] = (ushort)Math.Round(outputs.TargetXmm * PlcRegisterMap.PositionScale);
-        values[PlcRegisterMap.TargetY - PlcRegisterMap.WriteBlockStart] = (ushort)Math.Round(outputs.TargetYmm * PlcRegisterMap.PositionScale);
+
+        void Set(ushort address, ushort value) => values[address - PlcRegisterMap.WriteBlockStart] = value;
+        static ushort Flag(bool value) => value ? (ushort)1 : (ushort)0;
+
+        Set(PlcRegisterMap.PozEN, Flag(outputs.PozEnable));
+        Set(PlcRegisterMap.PozMode, outputs.PozMode);
+        Set(PlcRegisterMap.PozJog1, Flag(outputs.PozJog1));
+        Set(PlcRegisterMap.PozJog2, Flag(outputs.PozJog2));
+        Set(PlcRegisterMap.PozAckError, Flag(outputs.PozAckError));
+        Set(PlcRegisterMap.PozExecute, Flag(outputs.PozExecute));
+        Set(PlcRegisterMap.PozPositionSet, outputs.PozPosition);
+        Set(PlcRegisterMap.PozVelocity, outputs.PozVelocity);
+        Set(PlcRegisterMap.OverAcc, outputs.OverAcc);
+        Set(PlcRegisterMap.OverDec, outputs.OverDec);
+        Set(PlcRegisterMap.PionEN, Flag(outputs.PionEnable));
+        Set(PlcRegisterMap.PionSpeedSet, outputs.PionSpeed);
+        Set(PlcRegisterMap.PionDirection, Flag(outputs.PionDirectionDown));
+        Set(PlcRegisterMap.PionAckError, Flag(outputs.PionAckError));
 
         await _master.WriteMultipleRegistersAsync(_slaveId, PlcRegisterMap.WriteBlockStart, values);
-    }
-
-    private static bool IsBitSet(ushort value, int bit) => (value & (1 << bit)) != 0;
-
-    private static void SetBit(ref ushort value, int bit, bool set)
-    {
-        if (set)
-        {
-            value |= (ushort)(1 << bit);
-        }
     }
 
     public ValueTask DisposeAsync()

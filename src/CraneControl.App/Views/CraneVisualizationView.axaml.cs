@@ -15,21 +15,17 @@ public partial class CraneVisualizationView : UserControl
 
     private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is not CraneVisualizationViewModel vm || sender is not Control canvas)
+        if (sender is not Control canvas)
         {
             return;
         }
 
         var point = e.GetPosition(canvas);
-        var normX = point.X / vm.FieldWidth;
-        var normY = point.Y / vm.FieldHeight;
-        VisualizationClicked?.Invoke(this, new VisualizationClickedEventArgs(normX, normY));
+        VisualizationClicked?.Invoke(this, new VisualizationClickedEventArgs(CraneVisualizationViewModel.CanvasXToCm(point.X)));
     }
 }
 
-public sealed class VisualizationClickedEventArgs(double normX, double normY) : EventArgs
+public sealed class VisualizationClickedEventArgs(double positionCm) : EventArgs
 {
-    public double NormX { get; } = normX;
-
-    public double NormY { get; } = normY;
+    public double PositionCm { get; } = positionCm;
 }

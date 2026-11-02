@@ -7,13 +7,13 @@ using SkiaSharp;
 
 namespace CraneControl.App.ViewModels;
 
-/// <summary>Pojedynczy wykres liniowy z buforem próbek w czasie (używany 3x na oś).</summary>
+/// <summary>Pojedynczy wykres liniowy wartości w funkcji czasu trwania ruchu.</summary>
 public sealed class MiniChartViewModel
 {
     private readonly ObservableCollection<ObservablePoint> _points = new();
     private readonly double _minSpan;
 
-    public MiniChartViewModel(string title, string unit, uint colorArgb, double minSpan)
+    public MiniChartViewModel(string title, string unit, uint colorArgb, double minSpan, string format = "0.##")
     {
         Title = title;
         _minSpan = minSpan;
@@ -26,12 +26,12 @@ public sealed class MiniChartViewModel
                 Stroke = new SolidColorPaint(color, 2.5f),
                 Fill = new SolidColorPaint(color.WithAlpha(40)),
                 GeometrySize = 0,
-                LineSmoothness = 0.3,
+                LineSmoothness = 0,
             }
         ];
 
-        XAxes = [new Axis { Labeler = v => $"{v:0}s", MinLimit = 0, TextSize = 11 }];
-        YAxes = [new Axis { Labeler = v => $"{v:0.#}{unit}", TextSize = 11 }];
+        XAxes = [new Axis { Labeler = v => $"{v:0.0}s", MinLimit = 0, TextSize = 11 }];
+        YAxes = [new Axis { Labeler = v => $"{v.ToString(format)}{unit}", TextSize = 11 }];
     }
 
     public string Title { get; }
@@ -42,39 +42,34 @@ public sealed class MiniChartViewModel
 
     public Axis[] YAxes { get; }
 
-    /// <summary>Dodaje nową próbkę; ostateczne (przebazowane) X ustawia <see cref="RebaseX"/>.</summary>
-    public void AddRaw(double value)
+    public void Add(double x, double y)
     {
-        _points.Add(new ObservablePoint(0, value));
+        _points.Add(new ObservablePoint(x, y));
         UpdateYRange();
-    }
-
-    public void RemoveOldest()
-    {
-        if (_points.Count > 0)
-        {
-            _points.RemoveAt(0);
-            UpdateYRange();
-        }
     }
 
     public void Clear()
     {
         _points.Clear();
+        XAxes[0].MinLimit = 0;
         UpdateYRange();
     }
 
-    public void SetX(int index, double x)
+    /// <summary>Usuwa punkty starsze niż <paramref name="x"/> i przesuwa lewy kraniec osi czasu.</summary>
+    public void TrimBefore(double x)
     {
-        if (index >= 0 && index < _points.Count)
+        while (_points.Count > 0 && _points[0].X < x)
         {
-            _points[index].X = x;
+            _points.RemoveAt(0);
         }
+
+        XAxes[0].MinLimit = Math.Max(0, x);
+        UpdateYRange();
     }
 
     /// <summary>
     /// Wymusza minimalny rozstaw osi Y, żeby wykres nie "skakał" i nie dążył do
-    /// nieskończonego przybliżenia, gdy dźwignica stoi w miejscu (wartości bliskie zeru).
+    /// nieskończonego przybliżenia, gdy wartości są bliskie zeru.
     /// </summary>
     private void UpdateYRange()
     {

@@ -4,32 +4,31 @@ using CraneControl.App.Models;
 namespace CraneControl.App.Services;
 
 /// <summary>
-/// Symulator fizyki dźwignicy. Implementuje ten sam kontrakt co realny klient Modbus.
+/// Symulator dźwignicy. Implementuje ten sam kontrakt rejestrów co realny sterownik:
+/// polecenia osi X są wyzwalane zboczami narastającymi, oś Y działa na PionEN/kierunek/prędkość.
 /// </summary>
 public sealed class SimulatedPlcClient : IPlcClient
 {
-    private const double MaxSpeedMmPerS = 250;
-    private const double AccelerationMmPerS2 = 350;
-    private const double MoveThresholdMmPerS = 1.0;
-    private const double AutoPositionToleranceMm = 0.15;
+    private const double JogStepCm = 10;
+    private const double HomingSpeedCmPerS = 15;
+    private const double HomingAccelCmPerS2 = 100;
+    private const double PositionToleranceCm = 0.005;
+    private const double PionRampRpmPerS = 400;
 
-    private readonly double _travelXmm;
-    private readonly double _travelYmm;
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
-    private double _positionX = 200;
-    private double _positionY = 150;
-    private double _velocityX;
-    private double _velocityY;
+    private double _positionCm = 25;
+    private double _velocityCmPerS;
+    private double _targetCm = 25;
+    private double _maxSpeedCmPerS;
+    private double _accelCmPerS2;
+    private double _decelCmPerS2;
+    private bool _isMoving;
+    private bool _isHoming;
+    private bool _referenced;
+    private double _pionRpm;
     private TimeSpan _lastUpdate;
     private PlcOutputs _outputs = PlcOutputs.Default;
-    private bool _hasAutoTarget;
-
-    public SimulatedPlcClient(double travelXmm, double travelYmm)
-    {
-        _travelXmm = travelXmm;
-        _travelYmm = travelYmm;
-    }
 
     public bool IsConnected { get; private set; }
 
@@ -40,18 +39,43 @@ public sealed class SimulatedPlcClient : IPlcClient
         return Task.CompletedTask;
     }
 
-    /// <summary>Symulator odczytuje ostatnio ustawione wyjścia zamiast prawdziwego zapisu do PLC.</summary>
+    /// <summary>Symulator zachowuje się jak PLC: reaguje na zbocza narastające wyzwalaczy.</summary>
     public Task WriteOutputsAsync(PlcOutputs outputs, CancellationToken ct)
     {
+        var previous = _outputs;
         _outputs = outputs;
-        if (!outputs.AutoMode)
+
+        if (outputs.PozEnable)
         {
-            _hasAutoTarget = false;
+            _maxSpeedCmPerS = PlcScaling.RawToVelocityMps(outputs.PozVelocity) * 100;
+            _accelCmPerS2 = PlcScaling.RawToAccelMps2(outputs.OverAcc) * 100;
+            _decelCmPerS2 = PlcScaling.RawToAccelMps2(outputs.OverDec) * 100;
+
+            if (outputs.PozExecute && !previous.PozExecute)
+            {
+                if (outputs.PozMode == PozModes.Absolute)
+                {
+                    StartMove(PlcScaling.RawToPositionCm(outputs.PozPosition), homing: false);
+                }
+                else if (outputs.PozMode == PozModes.Homing)
+                {
+                    StartMove(0, homing: true);
+                }
+            }
+
+            if (outputs.PozMode == PozModes.JogStep)
+            {
+                if (outputs.PozJog1 && !previous.PozJog1)
+                {
+                    StartMove(_targetCm - JogStepCm, homing: false);
+                }
+                else if (outputs.PozJog2 && !previous.PozJog2)
+                {
+                    StartMove(_targetCm + JogStepCm, homing: false);
+                }
+            }
         }
-        else if (outputs.StartMove)
-        {
-            _hasAutoTarget = true;
-        }
+
         return Task.CompletedTask;
     }
 
@@ -62,122 +86,80 @@ public sealed class SimulatedPlcClient : IPlcClient
         _lastUpdate = now;
         if (dt > 0)
         {
-            Step(dt);
+            StepAxisX(dt);
+            StepPion(dt);
         }
 
-        var state = new CraneState
+        var positionRaw = PlcScaling.PositionToRaw(_positionCm);
+        return Task.FromResult(new CraneState
         {
-            PositionXmm = _positionX,
-            PositionYmm = _positionY,
-            Ready = true,
-            Fault = false,
-            MovingX = Math.Abs(_velocityX) > MoveThresholdMmPerS,
-            MovingY = Math.Abs(_velocityY) > MoveThresholdMmPerS,
-            LimitXMinus = _positionX <= 0,
-            LimitXPlus = _positionX >= _travelXmm,
-            LimitYMinus = _positionY <= 0,
-            LimitYPlus = _positionY >= _travelYmm,
-            AutoModeActive = _outputs.AutoMode,
-            InPosition = _outputs.AutoMode && _hasAutoTarget
-                && Math.Abs(_positionX - _outputs.TargetXmm) <= AutoPositionToleranceMm
-                && Math.Abs(_positionY - _outputs.TargetYmm) <= AutoPositionToleranceMm,
-            FaultCode = 0,
-        };
-
-        return Task.FromResult(state);
+            PositionXcm = PlcScaling.RawToPositionCm(positionRaw),
+            AxisXEnabled = _outputs.PozEnable,
+            AxisXReferenced = _referenced,
+            SpeedYRpm = PlcScaling.RawToPionSpeedOutRpm(PlcScaling.PionSpeedOutRpmToRaw(_pionRpm)),
+        });
     }
 
-    private void Step(double dt)
+    private void StartMove(double targetCm, bool homing)
     {
-        if (_outputs.Stop)
+        _targetCm = Math.Clamp(targetCm, 0, PlcScaling.MaxPositionCm);
+        _isMoving = true;
+        _isHoming = homing;
+        if (homing)
         {
-            _velocityX = RampToward(_velocityX, 0, dt);
-            _velocityY = RampToward(_velocityY, 0, dt);
+            _referenced = false;
+        }
+    }
 
-            _positionX = Math.Clamp(_positionX + _velocityX * dt, 0, _travelXmm);
-            _positionY = Math.Clamp(_positionY + _velocityY * dt, 0, _travelYmm);
+    private void StepAxisX(double dt)
+    {
+        if (!_isMoving)
+        {
             return;
         }
 
-        if (_outputs.AutoMode)
+        var maxSpeed = _isHoming ? HomingSpeedCmPerS : _maxSpeedCmPerS;
+        var accel = Math.Max(_isHoming ? HomingAccelCmPerS2 : _accelCmPerS2, 1);
+        var decel = Math.Max(_isHoming ? HomingAccelCmPerS2 : _decelCmPerS2, 1);
+
+        var distance = _targetCm - _positionCm;
+        var direction = Math.Sign(distance);
+        var brakingDistance = _velocityCmPerS * _velocityCmPerS / (2 * decel);
+
+        var desiredVelocity = Math.Abs(distance) <= brakingDistance
+            ? direction * Math.Sqrt(2 * decel * Math.Abs(distance))
+            : direction * maxSpeed;
+
+        var rate = Math.Abs(desiredVelocity) > Math.Abs(_velocityCmPerS) ? accel : decel;
+        var maxDelta = rate * dt;
+        _velocityCmPerS += Math.Clamp(desiredVelocity - _velocityCmPerS, -maxDelta, maxDelta);
+
+        var next = _positionCm + _velocityCmPerS * dt;
+        var overshot = Math.Sign(_targetCm - next) != direction;
+        if (overshot || Math.Abs(_targetCm - next) <= PositionToleranceCm || maxSpeed <= 0)
         {
-            if (!_hasAutoTarget)
+            _positionCm = maxSpeed <= 0 ? _positionCm : _targetCm;
+            _velocityCmPerS = 0;
+            _isMoving = false;
+            if (_isHoming)
             {
-                _velocityX = RampToward(_velocityX, 0, dt);
-                _velocityY = RampToward(_velocityY, 0, dt);
-                return;
+                _referenced = true;
+                _isHoming = false;
             }
 
-            (_positionX, _velocityX) = StepAutoAxis(_positionX, _outputs.TargetXmm, _velocityX, _outputs.SpeedX, dt, _travelXmm);
-            (_positionY, _velocityY) = StepAutoAxis(_positionY, _outputs.TargetYmm, _velocityY, _outputs.SpeedY, dt, _travelYmm);
             return;
         }
 
-        var targetVelX = _outputs.JogX / 100.0 * (_outputs.SpeedX / 100.0) * MaxSpeedMmPerS;
-        var targetVelY = _outputs.JogY / 100.0 * (_outputs.SpeedY / 100.0) * MaxSpeedMmPerS;
-        _velocityX = RampToward(_velocityX, targetVelX, dt);
-        _velocityY = RampToward(_velocityY, targetVelY, dt);
-
-        var nextX = _positionX + _velocityX * dt;
-        var nextY = _positionY + _velocityY * dt;
-
-        if (nextX <= 0 || nextX >= _travelXmm)
-        {
-            _velocityX = 0;
-        }
-
-        if (nextY <= 0 || nextY >= _travelYmm)
-        {
-            _velocityY = 0;
-        }
-
-        _positionX = Math.Clamp(nextX, 0, _travelXmm);
-        _positionY = Math.Clamp(nextY, 0, _travelYmm);
+        _positionCm = next;
     }
 
-    /// <summary>
-    /// Dojeżdża do celu: gdy jest już bardzo blisko albo krok symulacji przeskoczyłby
-    /// przez cel, pozycja jest "dopinana" do wartości docelowej zamiast zbliżać się do niej asymptotycznie.
-    /// </summary>
-    private static (double Position, double Velocity) StepAutoAxis(
-        double position, double target, double velocity, byte speedPercent, double dt, double travel)
+    private void StepPion(double dt)
     {
-        var distanceToTarget = target - position;
-        if (Math.Abs(distanceToTarget) <= AutoPositionToleranceMm && Math.Abs(velocity) < 2)
-        {
-            return (Math.Clamp(target, 0, travel), 0);
-        }
-
-        var maxSpeed = MaxSpeedMmPerS * (speedPercent / 100.0);
-        var brakingDistance = velocity * velocity / (2 * AccelerationMmPerS2);
-
-        double desiredVelocity;
-        if (Math.Abs(distanceToTarget) <= brakingDistance)
-        {
-            desiredVelocity = Math.Sign(distanceToTarget) * Math.Sqrt(2 * AccelerationMmPerS2 * Math.Abs(distanceToTarget));
-        }
-        else
-        {
-            desiredVelocity = Math.Sign(distanceToTarget) * maxSpeed;
-        }
-
-        var newVelocity = RampToward(velocity, Math.Clamp(desiredVelocity, -maxSpeed, maxSpeed), dt);
-        var newPosition = position + newVelocity * dt;
-
-        var overshot = Math.Sign(target - position) != Math.Sign(target - newPosition);
-        if (overshot || Math.Abs(target - newPosition) <= AutoPositionToleranceMm)
-        {
-            return (Math.Clamp(target, 0, travel), 0);
-        }
-
-        return (Math.Clamp(newPosition, 0, travel), newVelocity);
-    }
-
-    private static double RampToward(double current, double target, double dt)
-    {
-        var maxDelta = AccelerationMmPerS2 * dt;
-        var delta = Math.Clamp(target - current, -maxDelta, maxDelta);
-        return current + delta;
+        var targetRpm = _outputs.PionEnable
+            ? _outputs.PionSpeed * (_outputs.PionDirectionDown ? -1 : 1)
+            : 0;
+        var maxDelta = PionRampRpmPerS * dt;
+        _pionRpm += Math.Clamp(targetRpm - _pionRpm, -maxDelta, maxDelta);
     }
 
     public ValueTask DisposeAsync()

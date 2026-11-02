@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CraneControl.App.Models;
 
 namespace CraneControl.App.Services;
@@ -20,10 +21,11 @@ public sealed class PlcCommunicationService : IAsyncDisposable
         _period = period;
     }
 
-    /// <summary>Wyjścia zapisywane w każdym cyklu; aktualizowane przez warstwę UI.</summary>
-    public PlcOutputs Outputs { get; set; } = PlcOutputs.Default;
+    /// <summary>Źródło wyjść wywoływane raz w każdym cyklu tuż przed zapisem do PLC.</summary>
+    public Func<PlcOutputs> OutputsProvider { get; set; } = () => PlcOutputs.Default;
 
-    public event Action<CraneState>? StateUpdated;
+    /// <summary>Stan oraz czas jego pobrania w sekundach (zegar Stopwatch, środek transakcji odczytu).</summary>
+    public event Action<CraneState, double>? StateUpdated;
 
     public event Action<Exception>? CommunicationError;
 
@@ -60,15 +62,21 @@ public sealed class PlcCommunicationService : IAsyncDisposable
 
     private async Task RunLoopAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(_period);
-        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
+        var periodTicks = (long)(_period.TotalSeconds * Stopwatch.Frequency);
+        var nextCycle = Stopwatch.GetTimestamp();
+        while (!ct.IsCancellationRequested)
         {
             try
             {
                 var client = GetClient();
+                var requestStart = Stopwatch.GetTimestamp();
                 var state = await client.ReadStateAsync(ct);
-                StateUpdated?.Invoke(state);
-                await client.WriteOutputsAsync(Outputs, ct);
+                var requestEnd = Stopwatch.GetTimestamp();
+
+                // PLC próbkuje rejestr w trakcie transakcji, a nie w chwili nadejścia odpowiedzi.
+                var sampleTime = (requestStart + ((requestEnd - requestStart) / 2)) / (double)Stopwatch.Frequency;
+                StateUpdated?.Invoke(state, sampleTime);
+                await client.WriteOutputsAsync(OutputsProvider(), ct);
             }
             catch (OperationCanceledException)
             {
@@ -77,6 +85,24 @@ public sealed class PlcCommunicationService : IAsyncDisposable
             catch (Exception ex)
             {
                 CommunicationError?.Invoke(ex);
+            }
+
+            // Stały rytm bez nadrabiania spóźnionych cykli (seria odczytów jeden po drugim psułaby różniczkowanie).
+            nextCycle += periodTicks;
+            var now = Stopwatch.GetTimestamp();
+            if (nextCycle <= now)
+            {
+                nextCycle = now;
+                continue;
+            }
+
+            try
+            {
+                await Task.Delay(Stopwatch.GetElapsedTime(now, nextCycle), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
         }
     }

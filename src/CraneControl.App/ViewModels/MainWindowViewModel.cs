@@ -8,31 +8,17 @@ using CraneControl.App.Services;
 
 namespace CraneControl.App.ViewModels;
 
-/// <summary>Główny model widoku - spina komunikację z PLC, wizualizację i wykresy obu osi.</summary>
+/// <summary>Główny model widoku - spina komunikację z PLC oraz zakładki osi X i Y.</summary>
 public partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
-    private readonly PlcCommunicationService _plc;
-    private readonly AxisMotionTracker _trackerX = new();
-    private readonly AxisMotionTracker _trackerY = new();
-    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private static readonly TimeSpan CyclePeriod = TimeSpan.FromMilliseconds(10);
 
-    private bool _wasMovingX;
-    private bool _wasMovingY;
-    private sbyte _jogX;
-    private sbyte _jogY;
-    private bool _pulseStartMove;
-    private double _targetXmm;
-    private double _targetYmm;
+    private readonly PlcCommunicationService _plc;
+    private readonly PlcCommandSequencer _commands = new(CyclePeriod);
     private IPlcClient? _connectedRealClient;
 
     [ObservableProperty]
-    private double speedX = 50;
-
-    [ObservableProperty]
-    private double speedY = 50;
-
-    [ObservableProperty]
-    private bool isAutoMode;
+    private int selectedTabIndex;
 
     [ObservableProperty]
     private bool isConnected;
@@ -44,10 +30,7 @@ public partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string statusMessage = "Łączenie...";
 
     [ObservableProperty]
-    private bool isAutoModeConfirmedByPlc;
-
-    [ObservableProperty]
-    private string plcHost = "192.168.0.61";
+    private string plcHost = "192.168.0.15";
 
     [ObservableProperty]
     private int plcPort = 502;
@@ -66,24 +49,26 @@ public partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public MainWindowViewModel()
     {
-        var initialClient = new SimulatedPlcClient(Visualization.TravelXmm, Visualization.TravelYmm);
-        _plc = new PlcCommunicationService(initialClient, TimeSpan.FromMilliseconds(100));
+        AxisX = new AxisXViewModel(_commands);
+        AxisY = new AxisYViewModel(_commands);
+
+        _plc = new PlcCommunicationService(new SimulatedPlcClient(), CyclePeriod)
+        {
+            OutputsProvider = _commands.Next,
+        };
         _plc.StateUpdated += OnStateUpdated;
         _plc.CommunicationError += OnCommunicationError;
     }
 
-    public CraneVisualizationViewModel Visualization { get; } = new();
+    public AxisXViewModel AxisX { get; }
 
-    public AxisChartGroupViewModel ChartsX { get; } = new("X", 0xFF3DA5FF, 0xFFFFB020, 0xFF34D399);
-
-    public AxisChartGroupViewModel ChartsY { get; } = new("Y", 0xFFB37FEB, 0xFFFF6B6B, 0xFF34D399);
-
-    public string CurrentModeLabel => IsAutoMode ? "Sterowanie automatyczne aktywne" : "Sterowanie ręczne aktywne";
+    public AxisYViewModel AxisY { get; }
 
     public async Task StartAsync()
     {
         try
         {
+            _commands.RestartPozEnable();
             await _plc.StartAsync();
             IsConnected = IsRealPlcAvailable;
             ConnectionStatusIcon = IsConnected ? "✓" : "✕";
@@ -170,11 +155,14 @@ public partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
             else
             {
-                var simulated = new SimulatedPlcClient(Visualization.TravelXmm, Visualization.TravelYmm);
+                var simulated = new SimulatedPlcClient();
                 await simulated.ConnectAsync(CancellationToken.None);
                 await _plc.SwitchClientAsync(simulated);
                 ConnectionMessage = "Aktywne źródło danych: symulacja.";
             }
+
+            _commands.RestartPozEnable();
+            AxisY.ContinuousRecording = useReal && _connectedRealClient is not null;
         }
         catch (Exception ex)
         {
@@ -182,139 +170,63 @@ public partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    partial void OnSpeedXChanged(double value) => PushOutputs();
+    partial void OnSelectedTabIndexChanged(int value) => ReleaseAllKeys();
 
-    partial void OnSpeedYChanged(double value) => PushOutputs();
-
-    partial void OnIsAutoModeChanged(bool value)
+    /// <summary>Zwraca true, gdy klawisz został obsłużony jako sterowanie aktywnej zakładki.</summary>
+    public bool OnKeyDown(Key key)
     {
-        Visualization.IsAutoMode = value;
-        Visualization.HasTarget = false;
-        _targetXmm = Visualization.PositionXmm;
-        _targetYmm = Visualization.PositionYmm;
-        _jogX = 0;
-        _jogY = 0;
-        OnPropertyChanged(nameof(CurrentModeLabel));
-        PushOutputs();
+        switch (SelectedTabIndex, key)
+        {
+            case (0, Key.Left):
+                AxisX.OnJogKeyDown(right: false);
+                return true;
+            case (0, Key.Right):
+                AxisX.OnJogKeyDown(right: true);
+                return true;
+            case (1, Key.Up):
+                AxisY.SetUpHeld(true);
+                return true;
+            case (1, Key.Down):
+                AxisY.SetDownHeld(true);
+                return true;
+            default:
+                return false;
+        }
     }
 
-    /// <summary>Obsługa strzałek w trybie ręcznym (nacisk = jazda, puszczenie = stop).</summary>
-    public void OnArrowKeyDown(Key key)
+    public void OnKeyUp(Key key)
     {
-        if (IsAutoMode)
-        {
-            return;
-        }
-
         switch (key)
         {
-            case Key.Left: _jogX = -100; break;
-            case Key.Right: _jogX = 100; break;
-            case Key.Up: _jogY = -100; break;
-            case Key.Down: _jogY = 100; break;
-            default: return;
+            case Key.Left: AxisX.OnJogKeyUp(right: false); break;
+            case Key.Right: AxisX.OnJogKeyUp(right: true); break;
+            case Key.Up: AxisY.SetUpHeld(false); break;
+            case Key.Down: AxisY.SetDownHeld(false); break;
         }
-
-        PushOutputs();
     }
 
-    public void OnArrowKeyUp(Key key)
+    /// <summary>Zwalnia wszystkie klawisze (zmiana zakładki, utrata fokusu okna) - oś Y natychmiast się zatrzymuje.</summary>
+    public void ReleaseAllKeys()
     {
-        if (IsAutoMode)
-        {
-            return;
-        }
-
-        switch (key)
-        {
-            case Key.Left or Key.Right: _jogX = 0; break;
-            case Key.Up or Key.Down: _jogY = 0; break;
-            default: return;
-        }
-
-        PushOutputs();
+        AxisX.ReleaseKeys();
+        AxisY.ReleaseKeys();
     }
 
-    /// <summary>Kliknięcie na wizualizacji w trybie automatycznym zadaje nową pozycję docelową.</summary>
-    public void OnVisualizationClicked(double normX, double normY)
+    // Czas pochodzi z chwili odczytu w pętli komunikacji (nie z kolejki UI), żeby jitter dispatchera nie zniekształcał prędkości.
+    private void OnStateUpdated(CraneState state, double sampleTime)
     {
-        if (!IsAutoMode)
-        {
-            return;
-        }
-
-        var (xmm, ymm) = Visualization.NormalizedClickToMillimeters(normX, normY);
-        _targetXmm = xmm;
-        _targetYmm = ymm;
-        Visualization.TargetXmm = xmm;
-        Visualization.TargetYmm = ymm;
-        Visualization.HasTarget = true;
-        _pulseStartMove = true;
-        PushOutputs();
+        _commands.ReportPosition(PlcScaling.PositionToRaw(state.PositionXcm));
+        Dispatcher.UIThread.Post(() => ApplyState(state, sampleTime));
     }
 
-    private void PushOutputs()
+    private void ApplyState(CraneState state, double elapsed)
     {
-        _plc.Outputs = new PlcOutputs
-        {
-            AutoMode = IsAutoMode,
-            Enable = true,
-            JogX = IsAutoMode ? (sbyte)0 : _jogX,
-            JogY = IsAutoMode ? (sbyte)0 : _jogY,
-            SpeedX = (byte)SpeedX,
-            SpeedY = (byte)SpeedY,
-            TargetXmm = _targetXmm,
-            TargetYmm = _targetYmm,
-            StartMove = _pulseStartMove,
-        };
-        _pulseStartMove = false;
-    }
+        AxisX.ApplyState(state, elapsed);
+        AxisY.ApplyState(state, elapsed);
 
-    private void OnStateUpdated(CraneState state) => Dispatcher.UIThread.Post(() => ApplyState(state));
-
-    private void ApplyState(CraneState state)
-    {
-        var now = DateTime.UtcNow;
-        var elapsed = _clock.Elapsed.TotalSeconds;
-
-        Visualization.PositionXmm = state.PositionXmm;
-        Visualization.PositionYmm = state.PositionYmm;
-        _trackerX.Update(state.PositionXmm, now);
-        _trackerY.Update(state.PositionYmm, now);
-
-        UpdateAxisChart(ChartsX, _trackerX, elapsed, state.MovingX, IsAutoMode, ref _wasMovingX);
-        UpdateAxisChart(ChartsY, _trackerY, elapsed, state.MovingY, IsAutoMode, ref _wasMovingY);
-
-        IsAutoModeConfirmedByPlc = state.AutoModeActive;
         IsConnected = IsRealPlcAvailable;
         ConnectionStatusIcon = IsConnected ? "✓" : "✕";
         StatusMessage = IsConnected ? "Połączenie aktywne" : "Brak połączenia";
-    }
-
-    private static void UpdateAxisChart(
-        AxisChartGroupViewModel charts, AxisMotionTracker tracker, double elapsed, bool isMoving, bool isAutoMode, ref bool wasMoving)
-    {
-        // Tryb ręczny: bufor kołowy 15 s (licznik drogi rośnie stale). Tryb automatyczny:
-        // licznik i wykresy startują od zera przy każdym nowym ruchu i zamrażają się po jego końcu.
-        if (!isAutoMode)
-        {
-            charts.AddSample(elapsed, tracker.VelocityMmPerS, tracker.AccelerationMmPerS2, tracker.DistanceTraveledMm, trimToWindow: true);
-        }
-        else
-        {
-            if (isMoving && !wasMoving)
-            {
-                tracker.Reset();
-                charts.ClearAndRestart();
-            }
-
-            if (isMoving)
-            {
-                charts.AddSample(elapsed, tracker.VelocityMmPerS, tracker.AccelerationMmPerS2, tracker.DistanceTraveledMm, trimToWindow: false);
-            }
-        }
-
-        wasMoving = isMoving;
     }
 
     private void OnCommunicationError(Exception ex) => Dispatcher.UIThread.Post(() =>

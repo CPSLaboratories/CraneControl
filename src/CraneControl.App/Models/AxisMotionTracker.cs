@@ -1,54 +1,40 @@
 namespace CraneControl.App.Models;
 
 /// <summary>
-/// Wylicza prędkość, przyspieszenie i przebytą drogę jednej osi na podstawie kolejnych
-/// odczytów położenia (jedyna informacja dostępna z PLC). Stosuje lekkie wygładzanie (EMA),
-/// żeby wykresy nie "skakały" przez kwantyzację rejestru (0.1 mm).
+/// Wylicza prędkość i przyspieszenie na podstawie kolejnych odczytów położenia (jedyna informacja
+/// dostępna z PLC) jako surowe różnice bez wygładzania.
+/// Jednostki wynikowe wynikają z jednostek położenia (położenie w m -> m/s, m/s²).
 /// </summary>
 public sealed class AxisMotionTracker
 {
-    private const double SmoothingFactor = 0.35;
-
     private double _lastPosition;
-    private DateTime _lastTime;
+    private double _lastTime;
     private bool _initialized;
 
-    public double VelocityMmPerS { get; private set; }
-    public double AccelerationMmPerS2 { get; private set; }
-    public double DistanceTraveledMm { get; private set; }
+    public double Velocity { get; private set; }
+    public double Acceleration { get; private set; }
 
-    public void Update(double positionMm, DateTime timestamp)
+    public void Update(double position, double timeSeconds)
     {
         if (!_initialized)
         {
-            _lastPosition = positionMm;
-            _lastTime = timestamp;
+            _lastPosition = position;
+            _lastTime = timeSeconds;
             _initialized = true;
             return;
         }
 
-        var dt = (timestamp - _lastTime).TotalSeconds;
+        var dt = timeSeconds - _lastTime;
         if (dt <= 0)
         {
             return;
         }
 
-        var instantVelocity = (positionMm - _lastPosition) / dt;
-        var instantAcceleration = (instantVelocity - VelocityMmPerS) / dt;
+        var newVelocity = (position - _lastPosition) / dt;
+        Acceleration = (newVelocity - Velocity) / dt;
+        Velocity = newVelocity;
 
-        VelocityMmPerS += SmoothingFactor * (instantVelocity - VelocityMmPerS);
-        AccelerationMmPerS2 += SmoothingFactor * (instantAcceleration - AccelerationMmPerS2);
-        DistanceTraveledMm += Math.Abs(positionMm - _lastPosition);
-
-        _lastPosition = positionMm;
-        _lastTime = timestamp;
-    }
-
-    public void Reset()
-    {
-        _initialized = false;
-        VelocityMmPerS = 0;
-        AccelerationMmPerS2 = 0;
-        DistanceTraveledMm = 0;
+        _lastPosition = position;
+        _lastTime = timeSeconds;
     }
 }
